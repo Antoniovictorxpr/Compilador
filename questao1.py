@@ -1,55 +1,74 @@
-def transform_to_fng(grammar):
-    # Adiciona um novo símbolo inicial S' e a produção S' -> S
-    grammar['S\''] = ['S']
-    
-    # Remove produções da forma A -> αB, onde α é uma sequência de símbolos e B é um não-terminal
-    new_productions = {}
-    for non_terminal in grammar.keys():
-        for production in grammar[non_terminal]:
-            if len(production) > 1 and production[1] in grammar.keys():
-                new_non_terminal = production[1]
-                new_production = production[0]
-                if len(production) > 2:
-                    new_production += production[2:]
-                if new_non_terminal not in new_productions:
-                    new_productions[new_non_terminal] = []
-                new_productions[new_non_terminal].append(new_production)
-    
-    # Adiciona as novas produções à gramática
-    for non_terminal in new_productions.keys():
-        if non_terminal in grammar:
-            grammar[non_terminal].extend(new_productions[non_terminal])
-        else:
-            grammar[non_terminal] = new_productions[non_terminal]
-    
-    # Remove produções da forma A -> λ, adicionando novas produções para substituir cada ocorrência de A nas produções existentes
-    epsilon_productions = []
-    for non_terminal, productions in grammar.items():
-        if 'λ' in productions:
-            epsilon_productions.append(non_terminal)
-            grammar[non_terminal].remove('λ')
-    
-    for non_terminal, productions in grammar.items():
-        for epsilon_nt in epsilon_productions:
-            for production in productions:
-                new_productions = []
-                for i in range(len(production)):
-                    if production[i] == epsilon_nt:
-                        new_productions.append(production[:i] + production[i+1:])
-                grammar[non_terminal].extend(new_productions)
-    
-    return grammar
+def fng(gramatica):
+    gramatica_auxiliar = gramatica.copy()
+    simbolos_removidos = set()
 
-# Exemplo de gramática
-grammar = {
-    'S': ['aAd', 'A'],
-    'A': ['Bc', 'λ'],
-    'B': ['Ac', 'a']
+    # Remover produções com símbolos terminais
+    for variavel, producoes in gramatica_auxiliar.items():
+        novas_producoes = []
+        for producao in producoes:
+            if len(producao) == 1 and producao.isupper():
+                simbolos_removidos.add(producao)
+            else:
+                novas_producoes.append(producao)
+        gramatica_auxiliar[variavel] = novas_producoes
+    
+    # Remover produções que contêm símbolos removidos
+    for variavel, producoes in gramatica_auxiliar.items():
+        novas_producoes = []
+        for producao in producoes:
+            for removido in simbolos_removidos:
+                if removido in producao:
+                    producao = producao.replace(removido, "")
+            if producao:
+                novas_producoes.append(producao)
+        gramatica_auxiliar[variavel] = novas_producoes
+    
+    # Expandir a gramática
+    gramatica_auxiliar = expandir_gramatica(gramatica_auxiliar, gramatica)
+    
+    # Substituir símbolos na gramática
+    nova_variavel = {}
+    contador = 1
+    for variavel in gramatica_auxiliar:
+        nova_variavel[variavel] = 'A' + str(contador)
+        contador += 1
+    gramatica_auxiliar = substituir_simbolos(gramatica_auxiliar, nova_variavel)
+    
+    return gramatica_auxiliar
+
+
+def expandir_gramatica(gramatica, original):
+    nova_gramatica = {}
+    for variavel, producoes in gramatica.items():
+        novas_producoes = []
+        for producao in producoes:
+            if producao[0].isupper() and producao[0] in original:
+                novas_producoes.extend([subproducao + producao[1:] for subproducao in original[producao[0]]])
+            else:
+                novas_producoes.append(producao)
+        nova_gramatica[variavel] = novas_producoes
+    return nova_gramatica
+
+def substituir_simbolos(gramatica, simbolos):
+    nova_gramatica = {}
+    for variavel, producoes in gramatica.items():
+        novas_producoes = []
+        for producao in producoes:
+            nova_producao = ""
+            for simbolo in producao:
+                if simbolo.isupper() and simbolo in simbolos:
+                    nova_producao += simbolos[simbolo]
+                else:
+                    nova_producao += simbolo
+            novas_producoes.append(nova_producao)
+        nova_gramatica[simbolos[variavel]] = novas_producoes
+    return nova_gramatica
+
+# Definição da gramática
+gramatica = {
+    "S": ["AB", "CSB"],
+    "A": ["aB", "C"],
+    "B": ["bbB", "b"]
 }
 
-# Transforma a gramática para FNG
-fng_grammar = transform_to_fng(grammar)
-
-# Imprime a gramática transformada
-for non_terminal, productions in fng_grammar.items():
-    print(f'{non_terminal} -> {" | ".join(productions)}')
+print(fng(gramatica))
